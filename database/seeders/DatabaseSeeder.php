@@ -15,11 +15,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Один сид-пользователь для входа (регистрации в задании нет).
+        // updateOrCreate — идемпотентно: повторный запуск сидера не создаст дубль,
+        // а обновит существующего по email. Пароль хешируется автоматически (cast 'hashed').
+        User::query()->updateOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name' => 'Admin',
+                'password' => 'password',
+            ],
+        );
     }
 }

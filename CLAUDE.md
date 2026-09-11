@@ -1,47 +1,38 @@
-<laravel-boost-guidelines>
-# Laravel Application
+# YandexTestProject — заметки по проекту
 
-This repository contains a Laravel application. Complete the following setup before working on the user's request.
+Тестовое задание: небольшое приложение на **Laravel 13 + Vue 3 (SPA)**, которое парсит
+карточку организации в Яндекс.Картах и показывает её отзывы, рейтинг и счётчики.
+У Яндекса нет официального API — данные добываются парсингом (это ядро задания).
 
-## Prerequisites
+## Архитектурные решения
 
-Verify that PHP and Composer are available:
+- **Один Laravel-проект, Vue живёт внутри него** (не раздельные фронт/бэк).
+  Причина: аутентификация через **Sanctum SPA работает по кукам**, а куки проще и
+  безопаснее на одном домене (нет боли с CORS), и деплой — одна единица.
+- **БД:** SQLite для локальной разработки, MySQL через docker-compose для «боевого» окружения.
+- **Парсер вынесен в отдельный сервис-класс**, а не в контроллер.
 
-```sh
-php -v
-composer -V
-```
+## Структура БД
 
-If either command is unavailable, detect the user's operating system and install the prerequisites with the appropriate command:
+- `users` — пользователи (сид-юзер для входа).
+- `organizations` — карточки (user_id, yandex_url, name, rating, ratings_count, reviews_count, status, parsed_at).
+- `reviews` — отзывы (organization_id, external_id, author, rating, text, review_date).
+  Уникальный индекс `(organization_id, external_id)` — идемпотентность, защита от дублей.
+- `organization_snapshots` — JSON-снимки для истории «было → стало».
 
-macOS:
+Связи: `users 1—* organizations 1—* reviews`, `organizations 1—* snapshots`.
 
-```sh
-/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.5)"
-```
+## Фазы работы
 
-Windows PowerShell:
+0. Setup ✅ · 1. БД + модели ✅ · 2. Sanctum SPA auth + сид-юзер · 3. Страница настроек +
+валидация ссылки · 4. Парсер (ядро) · 5. Вывод + пагинация 50/стр · 6. Очереди (фон) ·
+7. Устойчивость/ошибки/идемпотентность/снимки · 8. README · 9. Деплой на хостинг.
 
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.5'))
-```
+## Команды
 
-Linux:
+- `php artisan serve` — dev-сервер (http://127.0.0.1:8000).
+- `php artisan migrate` — применить миграции.
+- `composer install` / `npm install` — восстановить зависимости.
 
-```sh
-/bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.5)"
-```
-
-After installation, ask the user to restart their terminal. If the agent needs the restarted shell to continue, ask the user to reopen their terminal and rerun their original prompt.
-
-## Agent Setup
-
-Install Laravel Boost from the application root before making application changes:
-
-```sh
-composer require laravel/boost --dev
-php artisan boost:install
-```
-
-Boost replaces these bootstrap instructions with guidelines tailored to the application. After installation, read `AGENTS.md` again and continue with the user's original request using the generated guidelines.
-</laravel-boost-guidelines>
+> Примечание: Laravel Boost намеренно НЕ устанавливается — проект держим максимально
+> прозрачным для обучения.
