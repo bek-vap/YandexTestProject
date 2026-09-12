@@ -1,58 +1,187 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Яндекс.Отзывы — парсер отзывов организаций
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Небольшое приложение: подключаешь карточку организации в Яндекс.Картах по ссылке и
+видишь её отзывы, средний рейтинг и счётчики. У Яндекса нет официального API — данные
+добываются парсингом (это ядро задания).
 
-## About Laravel
+**Стек:** Laravel 13 (бэкенд/API) · Vue 3 + Vite (SPA, Composition API) · Sanctum
+(SPA-аутентификация по кукам) · MySQL (в проде) / SQLite (локально) · Playwright
+(headless-браузер для парсинга) · очередь на базе БД (фоновая обработка).
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Что умеет
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Вход по логину/паролю (один сид-пользователь, без регистрации).
+- Страница настроек: вставка ссылки на организацию, валидация, сохранение.
+- Фоновый парсинг с индикацией статуса (в очереди → парсим → готово / ошибка).
+- Страница вывода: средний рейтинг, число оценок и отзывов **отдельно**, все отзывы
+  постранично по 50, у каждого — автор, дата, текст, оценка.
 
-## Learning Laravel
+**Сид-пользователь:** `admin@example.com` / `password`
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+---
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Запуск через Docker (рекомендуется)
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Нужен установленный Docker.
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+docker compose up --build
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Поднимутся три контейнера: база (MySQL), приложение (миграции + сервер) и воркер
+очереди (парсит в фоне). После старта открой **http://localhost:8000** и войди под
+сид-пользователем.
 
-## Contributing
+> При первом запуске образ собирается несколько минут — качается браузер Chromium и
+> зависимости.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Запуск локально без Docker
 
-## Code of Conduct
+Нужны PHP 8.2+, Composer, Node 20+.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+composer install
+npm install
+npx playwright install chromium      # браузер для парсера
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed            # по умолчанию SQLite
+```
 
-## Security Vulnerabilities
+Запустить в трёх терминалах:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+php artisan serve          # бэкенд + фронт
+npm run dev                # сборка фронта (dev)
+php artisan queue:work     # обработчик фоновых задач
+```
 
-## License
+## Переменные окружения
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+| Переменная | Значение | Зачем |
+|------------|----------|-------|
+| `QUEUE_CONNECTION` | `database` | фоновые задачи через таблицу `jobs` |
+| `YANDEX_REVIEW_LIMIT` | число или пусто | ограничить число отзывов (пусто = все ~600) |
+| `SANCTUM_STATEFUL_DOMAINS` | домен фронта | для куки-аутентификации Sanctum |
+| `DB_*` | параметры БД | подключение к MySQL/SQLite |
+
+---
+
+## Как устроено
+
+### База данных
+
+- `users` — пользователи.
+- `organizations` — карточки: `yandex_url`, `name`, `rating`, `ratings_count`,
+  `reviews_count`, `status`, `parsed_at`. Уникальность `(user_id, yandex_url)`.
+- `reviews` — отзывы: `external_id` (id отзыва у Яндекса), `author`, `rating`, `text`,
+  `review_date`. Уникальность `(organization_id, external_id)`.
+- `organization_snapshots` — JSON-снимки цифр на момент парсинга (история изменений).
+
+Связи: `users 1—* organizations 1—* reviews`, `organizations 1—* snapshots`.
+
+### Поток данных
+
+1. Пользователь сохраняет ссылку → контроллер валидирует и кладёт задачу
+   `ParseOrganizationJob` в очередь, сразу отвечая пользователю.
+2. Воркер берёт задачу и вызывает сервис `YandexReviewsParser` — он запускает
+   Node-скрипт `scripts/yandex-parser/parse.mjs` (headless-браузер).
+3. `OrganizationImporter` сохраняет организацию и отзывы в БД и делает снимок.
+4. Фронт опрашивает статус и показывает результат, когда готово.
+
+Логика парсинга вынесена в сервис-классы (`app/Services/Yandex`), а не в контроллер.
+
+---
+
+## Подход к парсингу и обход защиты
+
+Я исследовал, как Яндекс отдаёт отзывы (через DevTools → сеть). Нашёл внутренний
+запрос `GET /maps/api/business/fetchReviews` — он возвращает отзывы в JSON
+постранично (`page`, `pageSize=50`), а средний рейтинг и счётчики зашиты в HTML
+страницы (блок `ratingData` и микроразметка schema.org).
+
+**Проверил вариант «дёргать этот JSON напрямую из PHP» — он не работает:** запрос
+подписывается параметром `s` (его считает JS Яндекса), а токен `csrfToken` привязан
+к живой сессии браузера и протухает за ~15–30 секунд. Без настоящего браузера
+приходит `400 Bad Request`. Это и есть защита от ботов.
+
+**Поэтому выбран headless-браузер (Playwright).** Настоящий Chromium сам проходит
+защиту и подписывает запросы, а я:
+- беру первую страницу отзывов и агрегаты (рейтинг, счётчики) прямо из HTML;
+- перехватываю JSON-ответы `fetchReviews` при автопрокрутке — так добираю остальные
+  страницы;
+- складываю всё без дублей по `reviewId`.
+
+**Сравнение подходов:**
+
+| | Разбор JSON напрямую | Headless-браузер (выбран) |
+|--|--|--|
+| Скорость / ресурсы | быстрее, легче | тяжелее (запускает Chromium) |
+| Надёжность | ломается из-за подписи `s` | стабильно проходит защиту |
+| Данные | чистый JSON | тот же JSON (перехват) + микроразметка |
+| Риск | высокий (токены/подпись) | средний (смена вёрстки) |
+
+Идеальный вариант в продакшене — вообще не парсить, а получить данные по официальному
+партнёрскому доступу/платному API, если есть бюджет.
+
+---
+
+## Ответы по дополнительным требованиям
+
+### 1. Устойчивость к смене разметки
+
+Парсер не возвращает «молча» пустоту. Node-скрипт отдаёт понятные коды ошибок
+(`captcha`, `reviews_not_found`, `page_load_failed`), а сервис `YandexReviewsParser`
+превращает их в исключение `YandexParserException` с текстом. Если на странице нет
+ни встроенного массива отзывов, ни микроразметки рейтинга — это сигнал, что вёрстка
+изменилась, и задача помечается как `failed` с описанием ошибки (видно в интерфейсе и
+в логах). Так мы сразу узнаём о поломке, а не копим мусор.
+
+### 2. Обоснование подхода к парсингу
+
+См. раздел «Подход к парсингу» выше: выбран headless-браузер, потому что прямой разбор
+JSON блокируется подписью `s` и привязкой токена к живой сессии. Плюсы headless —
+надёжность и те же чистые данные; минусы — тяжелее и медленнее, чувствителен к смене
+вёрстки. Прямой JSON был бы быстрее, но требует реверс-инжиниринга подписи и очень
+хрупок.
+
+### 3. Масштаб и фоновая обработка
+
+Парсинг вынесен в очередь (`ParseOrganizationJob`, драйвер `database`). Для сети из
+~50 филиалов ставится 50 задач — воркер(ы) разбирают их по одной, не блокируя веб.
+Реализовано: повторные попытки (`tries=3`) с нарастающими паузами (`backoff`
+10/30/60 сек), увеличенный таймаут задачи, статусы `pending → parsing → done/failed`,
+которые фронт опрашивает и показывает. Масштабировать можно, подняв несколько воркеров.
+Более детальный прогресс (сколько отзывов уже собрано) можно добавить, обновляя поле
+прогресса по ходу парсинга.
+
+### 4. Анти-бан на объёме
+
+Реализовано частично, остальное — стратегия:
+- Настоящий браузер с реальным User-Agent — уже выглядит как обычный пользователь.
+- Ограничение объёма за один заход (`YANDEX_REVIEW_LIMIT`).
+- Что добавил бы дальше: троттлинг (паузы между организациями), экспоненциальный
+  бэкофф при ошибках, ротация прокси и User-Agent, обработка ситуации «нас забанили»
+  (при появлении капчи — пометить задачу и повторить позже с другого IP), парсинг по
+  расписанию редко, а не по каждому клику (данные берём из кэша в БД).
+
+### 5. Идемпотентность и история изменений
+
+Повторный парсинг **не создаёт дублей**: отзывы пишутся через `upsert` по паре
+`(organization_id, external_id)` — существующий обновляется, новый добавляется.
+Организация обновляется, а не пересоздаётся. Для истории «было → стало» на каждый
+парсинг создаётся запись в `organization_snapshots` с JSON-снимком цифр (рейтинг,
+счётчики). Сравнив два соседних снимка, видно, что изменилось. Полноценный диф
+(показывать разницу в интерфейсе) — следующий шаг.
+
+---
+
+## Что доделал бы с большим временем
+
+- Детальный прогресс парсинга (сколько отзывов собрано в реальном времени).
+- Ротацию прокси/User-Agent и троттлинг для безопасного парсинга многих карточек.
+- Экран истории изменений (диф снимков «было → стало»).
+- Тесты (сервис парсера с моками, фиче-тесты API).
+- Продакшн-веб-сервер (nginx + php-fpm) вместо `artisan serve`.

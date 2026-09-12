@@ -1,0 +1,53 @@
+# Общие переменные окружения для app и worker (чтобы не дублировать).
+x-app-env: &app-env
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_URL: http://localhost:8000
+  SANCTUM_STATEFUL_DOMAINS: localhost:8000
+  DB_CONNECTION: mysql
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_DATABASE: yandex
+  DB_USERNAME: yandex
+  DB_PASSWORD: secret
+  QUEUE_CONNECTION: database
+  YANDEX_REVIEW_LIMIT: "600"
+
+services:
+  # база данных
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: yandex
+      MYSQL_USER: yandex
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: rootsecret
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 15
+
+  # приложение: миграции + сервер
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: *app-env
+    command: sh -c "php artisan migrate --force && php artisan db:seed --force && php artisan serve --host=0.0.0.0 --port=8000"
+    ports:
+      - "8000:8000"
+
+  # воркер очереди: парсит отзывы в фоне
+  worker:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: *app-env
+    command: sh -c "until php artisan migrate:status >/dev/null 2>&1; do echo 'ждём миграции...'; sleep 3; done; php artisan queue:work --timeout=900 --tries=3"
+
+volumes:
+  dbdata:

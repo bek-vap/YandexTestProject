@@ -1,0 +1,8 @@
+.git
+node_modules
+vendor
+.env
+public/build
+database/database.sqlite
+npm-debug.log
+storage/logs/*.log

@@ -34,7 +34,11 @@ function normalize(r) {
 }
 
 const run = async () => {
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({
+        headless: true,
+        // флаги нужны, чтобы Chromium работал внутри Docker
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    });
     const context = await browser.newContext({
         locale: 'ru-RU',
         viewport: { width: 1280, height: 900 },
