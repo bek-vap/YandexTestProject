@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreOrganizationRequest;
+use App\Jobs\ParseOrganizationJob;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -34,8 +35,11 @@ class OrganizationController extends Controller
         // потому что идём через связь $request->user()->organizations().
         $organization = $request->user()->organizations()->updateOrCreate(
             ['yandex_url' => $data['yandex_url']],
-            ['status' => 'pending'], // парсинг запустим позже (Фаза 4)
+            ['status' => 'pending'],
         );
+
+        // запускаем парсинг в фоне, чтобы не держать пользователя
+        ParseOrganizationJob::dispatch($organization->id);
 
         return response()->json(['organization' => $organization], 201);
     }

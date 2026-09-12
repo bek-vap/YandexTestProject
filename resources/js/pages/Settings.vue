@@ -1,29 +1,35 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { auth, logout } from '../stores/auth';
 import api from '../lib/axios';
 
 const router = useRouter();
 
-const url = ref('');              // ссылка в поле ввода
-const organization = ref(null);   // сохранённая карточка
-const loadingOrg = ref(true);     // идёт первичная загрузка карточки
-const saving = ref(false);        // идёт сохранение
-const error = ref('');            // ошибка (в т.ч. валидации)
-const savedOk = ref(false);       // показать "сохранено"
+const url = ref('');
+const organization = ref(null);
+const loadingOrg = ref(true);
+const saving = ref(false);
+const error = ref('');
 
-// При открытии страницы — подтягиваем уже сохранённую карточку (если есть).
-onMounted(loadOrganization);
+let pollTimer = null;
+
+onMounted(async () => {
+    await loadOrganization();
+    // если парсинг ещё идёт — начинаем следить за статусом
+    if (['pending', 'parsing'].includes(organization.value?.status)) {
+        startPolling();
+    }
+});
+
+onUnmounted(stopPolling);
 
 async function loadOrganization() {
     loadingOrg.value = true;
     try {
         const { data } = await api.get('/api/organization');
         organization.value = data.organization;
-        if (data.organization) {
-            url.value = data.organization.yandex_url;
-        }
+        if (data.organization) url.value = data.organization.yandex_url;
     } catch {
         error.value = 'Не удалось загрузить данные.';
     } finally {
@@ -33,24 +39,37 @@ async function loadOrganization() {
 
 async function save() {
     error.value = '';
-    savedOk.value = false;
     saving.value = true;
-
     try {
         const { data } = await api.post('/api/organization', { yandex_url: url.value });
         organization.value = data.organization;
-        savedOk.value = true;
+        startPolling(); // ждём, пока фоновый парсинг отработает
     } catch (e) {
-        if (e.response?.status === 422) {
-            // Ошибка валидации от Laravel.
-            error.value = e.response.data.message ?? 'Проверьте ссылку.';
-        } else {
-            error.value = 'Не удалось сохранить. Попробуйте позже.';
-        }
+        error.value = e.response?.status === 422
+            ? (e.response.data.message ?? 'Проверьте ссылку.')
+            : 'Не удалось сохранить. Попробуйте позже.';
     } finally {
         saving.value = false;
     }
 }
+
+function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(async () => {
+        const { data } = await api.get('/api/organization');
+        organization.value = data.organization;
+        if (['done', 'failed'].includes(data.organization?.status)) stopPolling();
+    }, 3000);
+}
+
+function stopPolling() {
+    if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+}
+
+const status = computed(() => organization.value?.status);
 
 async function doLogout() {
     await logout();
@@ -64,10 +83,7 @@ async function doLogout() {
             <h1 class="text-2xl font-semibold">Настройки</h1>
             <div class="flex items-center gap-3 text-sm">
                 <span class="text-gray-500">{{ auth.user?.email }}</span>
-                <button
-                    @click="doLogout"
-                    class="rounded border border-gray-300 px-3 py-1 hover:bg-gray-100"
-                >
+                <button @click="doLogout" class="rounded border border-gray-300 px-3 py-1 hover:bg-gray-100">
                     Выйти
                 </button>
             </div>
@@ -95,20 +111,25 @@ async function doLogout() {
                 </button>
             </form>
 
-            <!-- Состояния под формой -->
-            <p v-if="error" class="mt-3 rounded bg-red-50 p-2 text-sm text-red-600">
-                {{ error }}
-            </p>
-            <p v-else-if="savedOk" class="mt-3 rounded bg-green-50 p-2 text-sm text-green-700">
-                Ссылка сохранена. Дальше здесь появятся отзывы и рейтинг.
-            </p>
+            <p v-if="error" class="mt-3 rounded bg-red-50 p-2 text-sm text-red-600">{{ error }}</p>
 
-            <!-- Инфо о текущей карточке -->
-            <div v-if="organization" class="mt-4 flex items-center justify-between border-t pt-4 text-sm text-gray-600">
-                <div>Статус: <b>{{ organization.status }}</b></div>
-                <router-link :to="{ name: 'reviews' }" class="rounded bg-gray-900 px-3 py-1 text-white hover:bg-gray-700">
-                    Смотреть отзывы →
-                </router-link>
+            <!-- Статус парсинга -->
+            <div v-if="organization" class="mt-4 border-t pt-4 text-sm">
+                <div v-if="status === 'pending'" class="text-gray-500">
+                    ⏳ В очереди на парсинг…
+                </div>
+                <div v-else-if="status === 'parsing'" class="text-blue-600">
+                    🔄 Парсим отзывы… это может занять пару минут.
+                </div>
+                <div v-else-if="status === 'failed'" class="text-red-600">
+                    ⚠️ Не получилось: {{ organization.last_error }}
+                </div>
+                <div v-else-if="status === 'done'" class="flex items-center justify-between">
+                    <span class="text-green-700">✅ Готово: {{ organization.reviews_count }} отзывов</span>
+                    <router-link :to="{ name: 'reviews' }" class="rounded bg-gray-900 px-3 py-1 text-white hover:bg-gray-700">
+                        Смотреть отзывы →
+                    </router-link>
+                </div>
             </div>
         </div>
     </div>

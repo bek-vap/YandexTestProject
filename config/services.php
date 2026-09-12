@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    // Ограничение числа отзывов при парсинге. Пусто = тянуть все.
+    'yandex' => [
+        'review_limit' => env('YANDEX_REVIEW_LIMIT'),
+    ],
+
 ];
