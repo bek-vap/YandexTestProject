@@ -36,13 +36,11 @@ function normalize(r) {
 const run = async () => {
     const browser = await chromium.launch({
         headless: true,
-        // флаги: чтобы Chromium работал в Docker и ел меньше памяти
-        // (single-process + disable-gpu важны на маленьких серверах)
+        // флаги для Docker; single-process не ставим — он ломает долгую прокрутку
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--single-process',
             '--disable-gpu',
         ],
     });
@@ -134,15 +132,27 @@ const run = async () => {
         out({ ok: false, error: 'reviews_not_found' });
     }
 
-    // крутим страницу вниз, пока не соберём все (или пока новые не кончатся)
+    // крутим вниз, пока не соберём все (или пока новые не кончатся)
     await page.mouse.move(300, 450);
     let stall = 0;
-    for (let i = 0; i < 300; i++) {
+    for (let i = 0; i < 400; i++) {
         if (target && reviews.size >= target) break;
-        if (stall >= 8) break;
+        if (stall >= 12) break;
         const before = reviews.size;
-        await page.mouse.wheel(0, 5000);
-        await page.waitForTimeout(800);
+
+        // скроллим сам контейнер списка (надёжнее колеса мыши)
+        await page.evaluate(() => {
+            const els = Array.from(document.querySelectorAll('*')).filter((el) => {
+                const s = getComputedStyle(el);
+                return (s.overflowY === 'auto' || s.overflowY === 'scroll')
+                    && el.scrollHeight > el.clientHeight + 200;
+            });
+            els.sort((a, b) => b.scrollHeight - a.scrollHeight);
+            if (els[0]) els[0].scrollTo(0, els[0].scrollHeight);
+        });
+        await page.mouse.wheel(0, 6000);
+        await page.waitForTimeout(1300);
+
         stall = reviews.size === before ? stall + 1 : 0;
     }
 
