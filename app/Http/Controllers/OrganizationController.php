@@ -30,9 +30,8 @@ class OrganizationController extends Controller
     {
         $data = $request->validated();
 
-        // updateOrCreate: если такая ссылка у пользователя уже есть — обновим,
-        // а не создадим дубль (идемпотентность). user_id проставится сам,
-        // потому что идём через связь $request->user()->organizations().
+        // если такая ссылка у юзера уже есть — обновим, а не создадим второй раз.
+        // user_id проставится сам, потому что идём через $request->user()->organizations()
         $organization = $request->user()->organizations()->updateOrCreate(
             ['yandex_url' => $data['yandex_url']],
             ['status' => 'pending'],

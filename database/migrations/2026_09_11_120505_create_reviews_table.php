@@ -14,13 +14,11 @@ return new class extends Migration
         Schema::create('reviews', function (Blueprint $table) {
             $table->id();
 
-            // Родитель отзыва — организация (one-to-many). Вот тот самый FK,
-            // про который ты сказал: "говорим отзыву, что его владелец — organization_id".
+            // у отзыва один владелец — организация (organization_id)
             $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
 
-            // ID отзыва СО СТОРОНЫ ЯНДЕКСА. Нужен для идемпотентности:
-            // при повторном парсинге по нему находим существующий отзыв и обновляем,
-            // а не создаём дубль.
+            // id отзыва у Яндекса. по нему при повторном парсинге находим
+            // этот же отзыв и обновляем, а не создаём второй раз
             $table->string('external_id')->nullable();
 
             $table->string('author')->nullable();             // автор отзыва
@@ -30,8 +28,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Один и тот же отзыв Яндекса не может дважды лежать у одной организации.
-            // Это гарантия БД против дублей (пункт 5 — идемпотентность).
+            // один и тот же отзыв не может дважды лежать у одной организации — без дублей
             $table->unique(['organization_id', 'external_id']);
         });
     }

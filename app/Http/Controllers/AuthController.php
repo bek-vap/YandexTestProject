@@ -30,7 +30,7 @@ class AuthController extends Controller
             ]);
         }
 
-        // Меняем id сессии после входа — защита от session fixation атаки.
+        // после входа меняем id сессии, чтобы старый нельзя было переиспользовать
         $request->session()->regenerate();
 
         return response()->json([

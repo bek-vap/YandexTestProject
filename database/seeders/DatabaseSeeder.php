@@ -16,8 +16,8 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Один сид-пользователь для входа (регистрации в задании нет).
-        // updateOrCreate — идемпотентно: повторный запуск сидера не создаст дубль,
-        // а обновит существующего по email. Пароль хешируется автоматически (cast 'hashed').
+        // updateOrCreate: если запустить сидер ещё раз, второй такой же юзер не создастся.
+        // пароль хешируется сам (cast 'hashed')
         User::query()->updateOrCreate(
             ['email' => 'admin@example.com'],
             [
