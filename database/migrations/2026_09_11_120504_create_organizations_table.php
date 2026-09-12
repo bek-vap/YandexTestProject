@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
 
             // Ссылка на карточку в Яндекс.Картах.
-            $table->string('yandex_url', 1000);
+            $table->string('yandex_url', 500);
 
             // Данные, которые заполняются ПОСЛЕ парсинга — поэтому nullable.
             $table->string('name')->nullable();               // название организации

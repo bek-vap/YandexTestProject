@@ -25,7 +25,7 @@ class StoreOrganizationRequest extends FormRequest
             'yandex_url' => [
                 'required',
                 'string',
-                'max:1000',
+                'max:500',
                 'url',                 // должно быть валидным URL
                 $this->yandexOrgUrl(),  // + наша проверка "это карточка организации Яндекса"
             ],
