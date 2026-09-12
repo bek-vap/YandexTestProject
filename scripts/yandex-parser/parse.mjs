@@ -36,8 +36,15 @@ function normalize(r) {
 const run = async () => {
     const browser = await chromium.launch({
         headless: true,
-        // флаги нужны, чтобы Chromium работал внутри Docker
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        // флаги: чтобы Chromium работал в Docker и ел меньше памяти
+        // (single-process + disable-gpu важны на маленьких серверах)
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--single-process',
+            '--disable-gpu',
+        ],
     });
     const context = await browser.newContext({
         locale: 'ru-RU',
