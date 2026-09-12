@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { auth, fetchUser } from './stores/auth';
 import Login from './pages/Login.vue';
 import Settings from './pages/Settings.vue';
+import Reviews from './pages/Reviews.vue';
 
 const routes = [
     { path: '/', redirect: '/settings' },
@@ -9,6 +10,7 @@ const routes = [
     { path: '/login', name: 'login', component: Login, meta: { guest: true } },
     // meta.auth — страница только для залогиненных.
     { path: '/settings', name: 'settings', component: Settings, meta: { auth: true } },
+    { path: '/reviews', name: 'reviews', component: Reviews, meta: { auth: true } },
 ];
 
 const router = createRouter({

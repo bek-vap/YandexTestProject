@@ -39,4 +39,23 @@ class OrganizationController extends Controller
 
         return response()->json(['organization' => $organization], 201);
     }
+
+    /**
+     * Отзывы организации постранично, по 50 на страницу.
+     */
+    public function reviews(Request $request): JsonResponse
+    {
+        $organization = $request->user()->organizations()->latest()->first();
+
+        if (! $organization) {
+            return response()->json(['message' => 'Организация не добавлена.'], 404);
+        }
+
+        // paginate сам берёт номер страницы из ?page= и считает всё остальное
+        $reviews = $organization->reviews()
+            ->orderByDesc('review_date')
+            ->paginate(50);
+
+        return response()->json($reviews);
+    }
 }

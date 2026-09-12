@@ -104,8 +104,11 @@ async function doLogout() {
             </p>
 
             <!-- Инфо о текущей карточке -->
-            <div v-if="organization" class="mt-4 border-t pt-4 text-sm text-gray-600">
+            <div v-if="organization" class="mt-4 flex items-center justify-between border-t pt-4 text-sm text-gray-600">
                 <div>Статус: <b>{{ organization.status }}</b></div>
+                <router-link :to="{ name: 'reviews' }" class="rounded bg-gray-900 px-3 py-1 text-white hover:bg-gray-700">
+                    Смотреть отзывы →
+                </router-link>
             </div>
         </div>
     </div>

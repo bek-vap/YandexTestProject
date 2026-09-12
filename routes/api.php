@@ -16,4 +16,5 @@ Route::middleware('auth:sanctum')->group(function () {
     // Карточка организации: получить текущую и сохранить ссылку.
     Route::get('/organization', [OrganizationController::class, 'show']);
     Route::post('/organization', [OrganizationController::class, 'store']);
+    Route::get('/organization/reviews', [OrganizationController::class, 'reviews']);
 });
