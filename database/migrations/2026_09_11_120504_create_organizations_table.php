@@ -13,29 +13,22 @@ return new class extends Migration
     {
         Schema::create('organizations', function (Blueprint $table) {
             $table->id();
-
-            // Владелец карточки: связь с users (one-to-many).
-            // cascadeOnDelete — если удалить юзера, его организации тоже удалятся.
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-
-            // Ссылка на карточку в Яндекс.Картах.
             $table->string('yandex_url', 500);
 
-            // Данные, которые заполняются ПОСЛЕ парсинга — поэтому nullable.
-            $table->string('name')->nullable();               // название организации
-            $table->decimal('rating', 3, 2)->nullable();      // средний рейтинг, напр. 4.75
-            $table->unsignedInteger('ratings_count')->nullable(); // сколько ОЦЕНОК
-            $table->unsignedInteger('reviews_count')->nullable(); // сколько ОТЗЫВОВ (отдельно!)
+            // заполняется после парсинга
+            $table->string('name')->nullable();
+            $table->decimal('rating', 3, 2)->nullable();
+            $table->unsignedInteger('ratings_count')->nullable();
+            $table->unsignedInteger('reviews_count')->nullable();
 
-            // Статус парсинга — пригодится для фоновой обработки (очереди) и обработки ошибок.
-            $table->string('status')->default('pending');     // pending | parsing | done | failed
-            $table->text('last_error')->nullable();           // текст последней ошибки
-            $table->timestamp('parsed_at')->nullable();       // когда последний раз успешно спарсили
+            $table->string('status')->default('pending'); // pending | parsing | done | failed
+            $table->text('last_error')->nullable();
+            $table->timestamp('parsed_at')->nullable();
 
             $table->timestamps();
 
-            // один юзер не может добавить одну ссылку дважды, а разные юзеры — могут,
-            // поэтому уникальность по паре (user_id, yandex_url)
+            // одну ссылку один юзер дважды не добавит (разные юзеры — могут)
             $table->unique(['user_id', 'yandex_url']);
         });
     }

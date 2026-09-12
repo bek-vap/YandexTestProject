@@ -14,7 +14,6 @@ class OrganizationImporter
     public function import(Organization $organization, array $data): void
     {
         DB::transaction(function () use ($organization, $data) {
-            // обновляем саму карточку
             $organization->update([
                 'name' => $data['name'] ?? null,
                 'rating' => $data['rating'] ?? null,

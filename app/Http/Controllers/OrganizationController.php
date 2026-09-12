@@ -9,9 +9,6 @@ use Illuminate\Http\Request;
 
 class OrganizationController extends Controller
 {
-    /**
-     * Текущая сохранённая карточка пользователя (или null, если ещё не добавил).
-     */
     public function show(Request $request): JsonResponse
     {
         $organization = $request->user()
@@ -22,30 +19,22 @@ class OrganizationController extends Controller
         return response()->json(['organization' => $organization]);
     }
 
-    /**
-     * Сохранить ссылку на организацию.
-     * Валидация уже прошла в StoreOrganizationRequest — сюда попадают чистые данные.
-     */
     public function store(StoreOrganizationRequest $request): JsonResponse
     {
         $data = $request->validated();
 
-        // если такая ссылка у юзера уже есть — обновим, а не создадим второй раз.
-        // user_id проставится сам, потому что идём через $request->user()->organizations()
+        // если ссылка уже есть — обновляем, а не создаём вторую (user_id проставится сам)
         $organization = $request->user()->organizations()->updateOrCreate(
             ['yandex_url' => $data['yandex_url']],
             ['status' => 'pending'],
         );
 
-        // запускаем парсинг в фоне, чтобы не держать пользователя
+        // парсим в фоне, чтобы не держать пользователя
         ParseOrganizationJob::dispatch($organization->id);
 
         return response()->json(['organization' => $organization], 201);
     }
 
-    /**
-     * Отзывы организации постранично, по 50 на страницу.
-     */
     public function reviews(Request $request): JsonResponse
     {
         $organization = $request->user()->organizations()->latest()->first();
@@ -54,7 +43,6 @@ class OrganizationController extends Controller
             return response()->json(['message' => 'Организация не добавлена.'], 404);
         }
 
-        // paginate сам берёт номер страницы из ?page= и считает всё остальное
         $reviews = $organization->reviews()
             ->orderByDesc('review_date')
             ->paginate(50);

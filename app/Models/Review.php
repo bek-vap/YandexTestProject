@@ -21,7 +21,6 @@ class Review extends Model
         'review_date' => 'datetime',
     ];
 
-    /** Отзыв принадлежит одной организации (обратная сторона hasMany). */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);

@@ -1,14 +1,8 @@
 import axios from 'axios';
 
-/**
- * Единый настроенный axios для всех запросов к нашему API.
- *
- * Для Sanctum SPA критичны две опции:
- *  - withCredentials: true  -> браузер прикладывает куки сессии к каждому запросу
- *    (иначе бэк нас не узнает, вход "не будет держаться").
- *  - withXSRFToken: true    -> axios сам берёт значение из куки XSRF-TOKEN
- *    и кладёт его в заголовок X-XSRF-TOKEN (защита от CSRF на POST/PUT/DELETE).
- */
+// axios для всех запросов к API.
+// withCredentials + withXSRFToken нужны для Sanctum SPA: браузер шлёт куку сессии,
+// а axios сам подставляет CSRF-токен из куки в заголовок X-XSRF-TOKEN.
 const api = axios.create({
     baseURL: '/',
     withCredentials: true,

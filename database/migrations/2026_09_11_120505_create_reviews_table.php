@@ -13,22 +13,19 @@ return new class extends Migration
     {
         Schema::create('reviews', function (Blueprint $table) {
             $table->id();
-
-            // у отзыва один владелец — организация (organization_id)
             $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
 
-            // id отзыва у Яндекса. по нему при повторном парсинге находим
-            // этот же отзыв и обновляем, а не создаём второй раз
+            // id отзыва у Яндекса — по нему при повторном парсинге обновляем, а не дублируем
             $table->string('external_id')->nullable();
 
-            $table->string('author')->nullable();             // автор отзыва
-            $table->unsignedTinyInteger('rating')->nullable(); // оценка 1..5
-            $table->longText('text')->nullable();             // текст отзыва
-            $table->timestamp('review_date')->nullable();     // дата отзыва (со стороны Яндекса)
+            $table->string('author')->nullable();
+            $table->unsignedTinyInteger('rating')->nullable();
+            $table->longText('text')->nullable();
+            $table->timestamp('review_date')->nullable();
 
             $table->timestamps();
 
-            // один и тот же отзыв не может дважды лежать у одной организации — без дублей
+            // защита от дублей отзывов у одной организации
             $table->unique(['organization_id', 'external_id']);
         });
     }

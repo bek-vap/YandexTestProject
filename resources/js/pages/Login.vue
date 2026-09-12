@@ -5,11 +5,10 @@ import { login } from '../stores/auth';
 
 const router = useRouter();
 
-// ref() — реактивные переменные. Меняешь .value -> интерфейс сам обновляется.
 const email = ref('admin@example.com');
 const password = ref('password');
-const loading = ref(false);   // идёт ли запрос (для блокировки кнопки)
-const error = ref('');        // текст ошибки для показа пользователю
+const loading = ref(false);
+const error = ref('');
 
 async function submit() {
     error.value = '';
@@ -17,17 +16,16 @@ async function submit() {
 
     try {
         await login(email.value, password.value);
-        // Успех -> уходим на страницу настроек.
         router.push({ name: 'settings' });
     } catch (e) {
-        // 422 -> у Laravel ошибки лежат в response.data.errors / message.
+        // 422 — ошибка валидации от Laravel
         if (e.response?.status === 422) {
             error.value = e.response.data.message ?? 'Неверные данные для входа.';
         } else {
             error.value = 'Не удалось войти. Попробуйте позже.';
         }
     } finally {
-        loading.value = false; // в любом случае снимаем "загрузку"
+        loading.value = false;
     }
 }
 </script>
@@ -40,7 +38,6 @@ async function submit() {
         >
             <h1 class="text-xl font-semibold">Вход</h1>
 
-            <!-- Блок ошибки: показывается только когда error не пустой -->
             <p v-if="error" class="rounded bg-red-50 p-2 text-sm text-red-600">
                 {{ error }}
             </p>
