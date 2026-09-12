@@ -52,6 +52,16 @@ const run = async () => {
     });
     const page = await context.newPage();
 
+    // не грузим картинки/видео/шрифты — сильно экономит память (нам нужен только текст)
+    await page.route('**/*', (route) => {
+        const type = route.request().resourceType();
+        if (type === 'image' || type === 'media' || type === 'font') {
+            route.abort();
+        } else {
+            route.continue();
+        }
+    });
+
     const reviews = new Map(); // reviewId -> отзыв (Map сам убирает дубли)
     let total = null;
 
