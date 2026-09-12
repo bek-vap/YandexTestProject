@@ -18,8 +18,7 @@ return new class extends Migration
             // cascadeOnDelete — если удалить юзера, его организации тоже удалятся.
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
 
-            // Ссылка на карточку в Яндекс.Картах. unique — одна и та же ссылка
-            // не может быть добавлена дважды (защита от дублей, пункт 5 задания).
+            // Ссылка на карточку в Яндекс.Картах.
             $table->string('yandex_url', 1000);
 
             // Данные, которые заполняются ПОСЛЕ парсинга — поэтому nullable.
@@ -34,6 +33,11 @@ return new class extends Migration
             $table->timestamp('parsed_at')->nullable();       // когда последний раз успешно спарсили
 
             $table->timestamps();
+
+            // Один пользователь не может добавить одну и ту же ссылку дважды
+            // (идемпотентность, пункт 5). Но РАЗНЫЕ пользователи — могут,
+            // поэтому уникальность составная, а не только по url.
+            $table->unique(['user_id', 'yandex_url']);
         });
     }
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\OrganizationController;
 use Illuminate\Support\Facades\Route;
 
 // Публичные роуты (вход доступен всем — иначе как войти).
@@ -11,4 +12,8 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Карточка организации: получить текущую и сохранить ссылку.
+    Route::get('/organization', [OrganizationController::class, 'show']);
+    Route::post('/organization', [OrganizationController::class, 'store']);
 });
