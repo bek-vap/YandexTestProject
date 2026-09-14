@@ -2,6 +2,7 @@
 
 namespace App\Services\Yandex;
 
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
@@ -23,23 +24,33 @@ class YandexReviewsParser
             $command[] = (string) $limit;
         }
 
-        $process = new Process($command);
-        $process->setTimeout($this->timeout);
+        // скрипт пишет результат в этот файл: большой ответ через stdout обрезался
+        $outFile = tempnam(sys_get_temp_dir(), 'yandex_');
 
         try {
+            $process = new Process($command, null, ['PARSER_OUT' => $outFile]);
+            $process->setTimeout($this->timeout);
             $process->run();
+            $raw = (string) file_get_contents($outFile);
         } catch (ProcessTimedOutException $e) {
             throw new YandexParserException('Парсер не успел за отведённое время.');
+        } finally {
+            @unlink($outFile);
         }
 
         if (! $process->isSuccessful()) {
             throw new YandexParserException('Не удалось запустить парсер: '.$process->getErrorOutput());
         }
 
-        $data = json_decode($process->getOutput(), true);
+        $data = json_decode($raw !== '' ? $raw : $process->getOutput(), true);
 
         // если пришёл не JSON — значит скрипт сломался
         if (! is_array($data)) {
+            Log::warning('Парсер вернул битый JSON', [
+                'json_error' => json_last_error_msg(),
+                'bytes' => strlen($raw),
+                'stderr' => mb_substr($process->getErrorOutput(), 0, 2000),
+            ]);
             throw new YandexParserException('Парсер вернул не то, что ожидали.');
         }
 

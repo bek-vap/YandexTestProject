@@ -1,14 +1,21 @@
 // Парсер отзывов Яндекс.Карт через настоящий браузер (Playwright).
 // Запуск: node parse.mjs "<ссылка>" [лимит отзывов]
-// Результат: один JSON в stdout.
+// Результат: один JSON в файл из PARSER_OUT (или в stdout, если его нет).
 
+import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const inputUrl = process.argv[2];
 const limit = process.argv[3] ? Number(process.argv[3]) : Infinity;
 
+// большой JSON через stdout может не успеть уйти до process.exit, поэтому пишем в файл
 function out(obj) {
-    process.stdout.write(JSON.stringify(obj));
+    const json = JSON.stringify(obj);
+    if (process.env.PARSER_OUT) {
+        fs.writeFileSync(process.env.PARSER_OUT, json);
+    } else {
+        process.stdout.write(json);
+    }
     process.exit(0);
 }
 
