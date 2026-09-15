@@ -21,13 +21,17 @@ function out(obj) {
 
 if (!inputUrl) out({ ok: false, error: 'no_url' });
 
-const idMatch = inputUrl.match(/(\d{6,})/);
-const businessId = idMatch ? idMatch[1] : null;
+// из любой ссылки на карточку делаем ссылку на вкладку отзывов
+// (отрезаем /photos/, /menu/, ?ll=... и всё лишнее)
+function toReviewsUrl(url) {
+    const m = String(url).match(/^(https?:\/\/[^/]+\/maps\/(?:\d+\/[^/]+\/)?org\/(?:[^/?#]+\/)?(\d+))/);
+    if (m) return { reviewsUrl: m[1] + '/reviews/', id: m[2] };
+    const oid = String(url).match(/[?&]oid=(\d+)/);
+    if (oid) return { reviewsUrl: 'https://yandex.ru/maps/org/' + oid[1] + '/reviews/', id: oid[1] };
+    return null;
+}
 
-// ссылка сразу на вкладку отзывов
-let reviewsUrl = inputUrl.split('?')[0];
-if (!reviewsUrl.endsWith('/')) reviewsUrl += '/';
-if (!reviewsUrl.includes('/reviews')) reviewsUrl += 'reviews/';
+let businessId = null;
 
 // приводим один отзыв к нашему виду
 function normalize(r) {
@@ -84,8 +88,38 @@ const run = async () => {
         } catch (e) {}
     });
 
+    // короткую ссылку (/maps/-/...) сначала открываем, чтобы узнать полный адрес карточки
+    let card = toReviewsUrl(inputUrl);
+    if (!card && /\/maps\/-\//.test(inputUrl)) {
+        try {
+            await page.goto(inputUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+            await page.waitForTimeout(2000);
+        } catch (e) {
+            await browser.close();
+            out({ ok: false, error: 'page_load_failed' });
+        }
+        if (/showcaptcha|smartcaptcha/i.test(page.url())) {
+            await browser.close();
+            out({ ok: false, error: 'captcha' });
+        }
+        card = toReviewsUrl(page.url());
+        if (!card) {
+            const canonical = await page.evaluate(() => {
+                const el = document.querySelector('link[rel="canonical"], meta[property="og:url"]');
+                return el ? (el.href || el.content) : null;
+            });
+            if (canonical) card = toReviewsUrl(canonical);
+        }
+    }
+
+    if (!card) {
+        await browser.close();
+        out({ ok: false, error: 'bad_url' });
+    }
+    businessId = card.id;
+
     try {
-        await page.goto(reviewsUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+        await page.goto(card.reviewsUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
     } catch (e) {
         await browser.close();
         out({ ok: false, error: 'page_load_failed' });
